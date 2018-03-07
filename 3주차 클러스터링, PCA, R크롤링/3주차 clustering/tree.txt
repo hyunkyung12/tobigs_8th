@@ -1,0 +1,171 @@
+rm(list = ls())
+
+setwd("C:/Users/USER/Desktop/투빅스/4주차 트리")
+
+data = read.csv("mroz.csv")
+str(data)
+attach(data)
+
+set.seed(1234)
+intrain = createDataPartition(y=data$work, p=0.7, list=FALSE) 
+train = data[intrain,]
+test  = data[-intrain,]
+
+table(train$work)/sum(table(train$work))
+table(test$work)/sum(table(test$work))
+
+ten = train[,10]
+## gini function
+gini = function(train,y,x){
+  
+  gy = train[,y]
+  gy = ifelse(gy=="yes",1,0)
+  gx = train[,x]
+  
+  if(is.factor(gx)){
+    return("factor")
+
+  }else{
+    quan = summary(gx)
+    quan = quan[2:5]
+    
+    pr1 = c()
+    pr2 = c()
+    w = c()
+
+    for(i in 1:4){
+      pr1[i] = sum(gy[which(gx>=quan[i])])/length(gy)
+      pr2[i] = 1-pr1[i]
+      w[i] = sum(ifelse(gx>=quan[i],1,0))/length(gx)
+    }
+   
+    ginire = (1-pr1^2-(1-pr1^2))*w + (1-pr2^2-(1-pr2^2))*(1-w)
+
+    return(which.min(ginire))
+  }
+}
+
+gini = function(train,y,x){
+  
+  gy = train[,y]
+  gx = train[,x]
+  
+  if(is.factor(gx)){
+    return("factor")
+  }else{
+    quan = summary(gx)
+    quan = quan[2:5]
+    
+    vec = c()
+    pr1 = c()
+    pr2 = c()
+    w = c()
+    gini = c()
+       
+    for(i in 1:4){
+      vec[i] = sum(ifelse(gx>=quan[i],1,0))
+      pr1[i] = length(gy[which(vec=="yes")])/length(gy[vec[i]==1])
+      pr2[i] = length(gy[which(vec!="yes")])/length(gy[vec[i]!=1])
+      w = length(gy[vec==1])/length(gy)
+      gini[i] = pr1*w + pr2*(1-w) 
+      
+    }
+    
+    return(which.min(gini))
+  }
+}
+
+
+a = for(i in 2:18){
+  gini(train,1,i)
+}
+
+gini = function(train,y,x){
+  a<-train[,x]
+  y<-train[,1]
+
+  if(is.factor(a)==TRUE) { return("factor")}
+  else{
+    quan<-summary(a)
+    gini<-c()
+    
+    for(i in 2:5){
+      xx <-ifelse(a>quan[i],1,0)
+      pl <- sum(y[xx==1]=="yes")/length(y[xx==1])
+      pr <- sum(y[xx!=1]=="yes")/length(y[xx!=1])
+      gl <-1-((pl)^2+(1-pl)^2)
+      gr <-1-((pr)^2+(1-pr)^2)
+      w <- length(y[xx==1])/length(y)
+      gini[i-1] <- gl*w +gr*(1-w) 
+      #for(i in 2:5)에서 2~5로 했으니까 gini[i-1]로 쓰기
+    }
+  }
+  return(which.min(gini))
+}
+
+
+tree = function(train,test,y,x){
+  
+  quan = summary(train[,x])
+  quan = quan[2:5]
+  g = gini(train,y,x)
+
+  if(g=="factor"){
+    
+    com <- summary(train[,1][train[,x]==levels(train[,x])[1]])
+    result3 = c()
+    
+    if(test[,x]==levels(train[,x])[1]){
+      result3[which(test[,x]=="no")] = names(com[com==max(com)])
+    }else{
+      result3[which(test[,x]=="yes")] = names(com[com!=max(com)])
+    }
+    
+    return(result3)
+    
+  }else{
+    
+    vec = ifelse(train[,x]>quan[g],1,0)
+    
+    result1 = c()
+    
+    tl = names(summary(train[,y][vec==1])[summary(train[,y][vec==1])==max(summary(train[,y][vec==1]))])
+    tr = levels(train[,y])[levels(train[,y])!=tl]
+    
+    vec2 = ifelse(test[,x]>quan[g],1,0)
+    
+    result2 = c()
+    result2[which(vec2==1)]=tl
+    result2[which(vec2==0)]=tr
+    
+    return(result2)
+  }
+}
+
+a = tree(train,test,1,13)
+
+length(a[which(a=="no")])
+
+randomforest = function(train,test,mtry){
+  
+  mtry = 5
+  if(mtry%%2==0){
+    return("홀수로 뽑아주세요")
+  }else{
+    rand = sample(2:length(names(test)),mtry)
+    for(i in 1:nrow(test)){
+      vote = matrix(0,nrow=length(rand),ncol=())
+      for(j in rand){
+        vote[[j]] = tree(train,test,1,j)
+      }
+    }
+    result = c()
+    for(i in 1:length(vote)){
+      for(j in 1:nrow(test)){
+        result[j] = vote[[i]][j]
+        c = summary(result)
+      }
+    }
+  }
+}
+
