@@ -1,0 +1,228 @@
+---
+title: Rgorithm
+---
+
+0. 데이터 불러오기
+```{r}
+directory <- "해당 파일의 경로를 넣어주세요!"
+adult <- read.csv(paste0(directory, "\\adult.csv"))
+set.seed(1)
+```
+
+1. 데이터 관찰
+1-1. 데이터 보기
+```{r}
+View(adult)
+```
+
+1-2. 데이터 약식으로 보기
+```{r}
+str(adult)
+```
+
+```{r}
+head(adult)
+```
+
+```{r}
+summary(adult)
+```
+
+```{r}
+#install.packages("doBy")
+library(doBy)
+summaryBy(.~income, data = adult)
+```
+
+```{r}
+table(adult$income)
+```
+
+```{r}
+table(adult$education, adult$income)
+```
+
+1-3. 데이터 시각화 해보기
+```{r}
+plot(adult$income, adult$hours.per.week)
+```
+
+```{r}
+plot(adult$income, adult$age)
+```
+
+```{r}
+hist(adult$age)
+```
+
+```{r}
+#install.packages("psych")
+library(psych)
+pairs.panels(adult[1:100,])
+```
+
+3. 데이터 전처리
+3-1. 데이터 정제
+3-1-1. 삭제
+```{r}
+is.na(adult)
+```
+
+```{r}
+sum(is.na(adult))
+```
+
+```{r}
+colSums(is.na(adult))
+```
+
+```{r}
+adult <- na.omit(adult)
+#adult <- adult[complete.cases(adult[,c("income")]),]
+```
+
+3-2. 데이터 통합
+```{r}
+edu <- read.csv(paste0(directory, "\\edu.csv"))
+View(edu)
+```
+
+```{r}
+adult1 <- cbind(adult, education.num = 0)
+for(i in 1:nrow(adult))
+{
+  wh <- which(edu$education == adult1$education[i])
+  adult1$education.num[i] <- edu$education.num[wh] # adult1$education[i]는 adult1[i, "education"]과 동일합니다.
+}
+adult1
+```
+
+```{r}
+adult2 <- merge(adult, edu, key = education)
+adult2
+```
+
+3-3. 데이터 정리
+```{r}
+dupl <- c()
+nr <- nrow(adult2)
+nc <- ncol(adult2)
+for(i in 1:(nr-1))
+{
+   for(j in (i+1):nr)
+   {
+     if(sum(adult2[i,] == adult2[j,]) == nc)
+     {
+       dupl <- c(dupl, i)
+       break
+     }
+   }
+}
+dupl
+```
+
+```{r}
+nrow(unique(adult2))
+adult3 <- unique(adult2)
+```
+
+```{r}
+duplicated(adult2)
+```
+
+```{r}
+wh <- which(duplicated(adult2))
+adult2[wh,]
+```
+
+```{r}
+adult4 <- adult2[-wh,]
+```
+
+```{r}
+#install.packages("dplyr")
+library(dplyr)
+adult5 <- distinct(adult2)
+```
+
+3-4. 데이터 변환
+3-4-1. 데이터 스케일 변환
+```{r}
+scale(adult5$fnlwgt)
+```
+
+```{r}
+mean(scale(adult5$fnlwgt))
+sd(scale(adult5$fnlwgt))
+```
+
+```{r}
+shapiro.test(sample(adult$fnlwgt, 5000))
+```
+
+```{r}
+qqnorm(adult5$fnlwgt)
+qqline(adult5$fnlwgt)
+```
+
+```{r}
+shapiro.test(sample(log(adult5$fnlwgt), 5000))
+```
+
+```{r}
+shapiro.test(sample(sqrt(adult5$fnlwgt), 5000))
+```
+
+4. 모델 적합 & 테스트
+4-1. 데이터 샘플링
+```{r}
+train_number <- sample(1:nrow(adult5), nrow(adult5) * 0.7)
+train1 <- adult5[train_number,]
+test1 <- adult5[-train_number,]
+```
+
+```{r}
+test2 <- sampleBy(~ income, frac = 0.3, data = adult5)
+dummy <- rbind(adult5, test2)
+train2 <- adult5[-which(duplicated(dummy, fromLast = TRUE)),]
+table(test2$income)
+table(train2$income)
+```
+
+```{r}
+table(adult5$gender)
+```
+
+```{r}
+#install.packages("sampling")
+library(sampling)
+a <- nrow(adult5) * 0.3 / 12
+x <- strata(c("income", "gender"), c(6 * a, 2 * a, 3 * a, 1 * a), data = adult5)
+test3 <- adult5[x$ID_unit,]
+train3 <- adult5[-x$ID_unit,]
+```
+
+4-2. 모델 적합
+```{r}
+train3$income <- as.integer(train3$income) - 1
+test3$income <- as.integer(test3$income) - 1
+if(length(which(test3$native.country == "Holand-Netherlands"))>0)
+{
+  test3 <- test3[-which(test3$native.country == "Holand-Netherlands"),]
+}
+```
+
+```{r}
+model <- glm(income ~ ., data = train3, family = binomial)
+summary(model)
+```
+
+4-3. 모델 평가
+```{r}
+tt <- table(round(predict.glm(model, test3[,-14], type = "response")), test3[,14])
+tt
+```
+
+```{r}
+sum(diag(tt))/sum(tt)
+```
